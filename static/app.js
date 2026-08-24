@@ -1,3 +1,6 @@
+// REPLACE THIS URL with your actual live Render Web Service URL (No slash at the end)
+const API_URL = "https://your-render-app-name.onrender.com";
+
 let token = localStorage.getItem("rise_token");
 
 // Run UI check when page loads
@@ -11,7 +14,7 @@ async function register() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const res = await fetch("/register", {
+    const res = await fetch(`${API_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
@@ -33,7 +36,7 @@ async function login() {
     formData.append("username", email);
     formData.append("password", password);
 
-    const res = await fetch("/login", {
+    const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData
@@ -62,10 +65,13 @@ function showDashboard() {
     document.getElementById("task-card").classList.remove("hidden");
     document.getElementById("auth-status").innerText = "Logged In";
     fetchTasks();
+    
+    // Auto-sync tasks every 5 seconds so changes appear live!
+    setInterval(fetchTasks, 5000);
 }
 
 async function fetchTasks() {
-    const res = await fetch("/tasks", {
+    const res = await fetch(`${API_URL}/tasks`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
 
@@ -91,7 +97,7 @@ async function createTask() {
     const title = titleInput.value;
     if (!title) return;
 
-    const res = await fetch("/tasks", {
+    const res = await fetch(`${API_URL}/tasks`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -107,7 +113,7 @@ async function createTask() {
 }
 
 async function deleteTask(id) {
-    const res = await fetch(`/tasks/${id}`, {
+    const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
     });
