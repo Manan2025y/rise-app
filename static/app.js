@@ -5,11 +5,21 @@ let timerInterval = null;
 let timeLeft = 25 * 60;
 let isTimerRunning = false;
 
+// Audio Synth State (Web Audio API - Pure JS Ambient Generator)
+let audioCtx = null;
+let activeNoiseNode = null;
+let activeNoiseType = null;
+
 window.onload = () => {
     if (token) {
         showDashboard();
     }
 };
+
+function changeTheme(themeName) {
+    document.body.className = `${themeName} min-h-screen font-sans`;
+    localStorage.setItem("rise_theme", themeName);
+}
 
 async function register() {
     const email = document.getElementById("email").value;
@@ -53,6 +63,7 @@ async function login() {
 function logout() {
     localStorage.removeItem("rise_token");
     token = null;
+    stopNoise();
     document.getElementById("auth-card").classList.remove("hidden");
     document.getElementById("dashboard").classList.add("hidden");
 }
@@ -60,8 +71,14 @@ function logout() {
 function showDashboard() {
     document.getElementById("auth-card").classList.add("hidden");
     document.getElementById("dashboard").classList.remove("hidden");
+    
+    const savedTheme = localStorage.getItem("rise_theme") || "theme-amber";
+    document.getElementById("theme-selector").value = savedTheme;
+    changeTheme(savedTheme);
+
     refreshAllData();
-    setInterval(refreshAllData, 5000);
+    fetchQuote();
+    setInterval(refreshAllData, 10000);
 }
 
 function refreshAllData() {
@@ -70,11 +87,34 @@ function refreshAllData() {
     fetchHabits();
 }
 
+async function fetchQuote() {
+    try {
+        const res = await fetch(`${API_URL}/quotes/random`);
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById("quote-container").innerText = `"${data.quote}" — ${data.author}`;
+        }
+    } catch (e) {}
+}
+
 async function fetchUserData() {
-    const res = await fetch(`${API_URL}/tasks`, {
+    const res = await fetch(`${API_URL}/users/me`, {
         headers: { "Authorization": `Bearer ${token}` }
     });
-    if (res.status === 401) logout();
+    if (res.status === 401) return logout();
+    if (res.ok) {
+        const user = await res.json();
+        document.getElementById("user-display-email").innerText = user.email.split("@")[0];
+        document.getElementById("user-avatar").innerText = user.email.charAt(0).toUpperCase();
+        document.getElementById("user-points").innerText = user.points;
+        document.getElementById("user-xp").innerText = user.xp;
+
+        // Level & Progress Bar Logic (100 XP per Level)
+        const level = Math.floor(user.xp / 100) + 1;
+        const currentLevelProgress = user.xp % 100;
+        document.getElementById("user-level").innerText = level;
+        document.getElementById("level-bar").style.width = `${currentLevelProgress}%`;
+    }
 }
 
 async function fetchTasks() {
@@ -86,15 +126,19 @@ async function fetchTasks() {
         const list = document.getElementById("task-list");
         list.innerHTML = "";
         tasks.forEach(task => {
-            const priorityColors = { low: "bg-blue-900 text-blue-300", medium: "bg-yellow-900 text-yellow-300", high: "bg-red-900 text-red-300" };
+            const priorityColors = {
+                low: "bg-blue-950 text-blue-300 border-blue-800",
+                medium: "bg-amber-950 text-amber-300 border-amber-800",
+                high: "bg-red-950 text-red-300 border-red-800"
+            };
             const li = document.createElement("li");
-            li.className = "flex justify-between items-center p-3 bg-gray-800 border border-gray-700 rounded-lg";
+            li.className = "flex justify-between items-center p-3.5 bg-gray-900 border border-gray-800 rounded-xl text-sm";
             li.innerHTML = `
                 <div class="flex items-center gap-3">
-                    <span class="text-xs px-2 py-1 rounded font-semibold ${priorityColors[task.priority] || priorityColors.medium}">${task.priority}</span>
+                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${priorityColors[task.priority] || priorityColors.medium}">${task.priority}</span>
                     <span class="${task.completed ? 'line-through text-gray-500' : 'text-gray-200'}">${task.title}</span>
                 </div>
-                <button onclick="deleteTask(${task.id})" class="text-gray-500 hover:text-red-400 font-bold px-2">✕</button>
+                <button onclick="deleteTask(${task.id})" class="text-gray-600 hover:text-red-400 font-bold px-2">✕</button>
             `;
             list.appendChild(li);
         });
@@ -136,10 +180,10 @@ async function fetchHabits() {
         list.innerHTML = "";
         habits.forEach(habit => {
             const li = document.createElement("li");
-            li.className = "flex justify-between items-center p-2 bg-gray-800 border border-gray-700 rounded text-sm";
+            li.className = "flex justify-between items-center p-3 bg-gray-900 border border-gray-800 rounded-xl text-xs";
             li.innerHTML = `
                 <span class="text-gray-200">${habit.title}</span>
-                <span class="text-xs text-amber-400 font-bold">🔥 ${habit.current_streak} d</span>
+                <span class="text-amber-400 font-bold">🔥 ${habit.current_streak} days</span>
             `;
             list.appendChild(li);
         });
@@ -167,11 +211,11 @@ function toggleTimer() {
         clearInterval(timerInterval);
         isTimerRunning = false;
         btn.innerText = "Resume Focus";
-        btn.className = "w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded";
+        btn.className = "w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition";
     } else {
         isTimerRunning = true;
         btn.innerText = "Pause Timer";
-        btn.className = "w-full py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded";
+        btn.className = "w-1/2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition";
         timerInterval = setInterval(() => {
             if (timeLeft > 0) {
                 timeLeft--;
@@ -182,6 +226,15 @@ function toggleTimer() {
             }
         }, 1000);
     }
+}
+
+function resetTimer() {
+    clearInterval(timerInterval);
+    isTimerRunning = false;
+    timeLeft = 25 * 60;
+    updateTimerDisplay();
+    document.getElementById("timer-btn").innerText = "Start Focus";
+    document.getElementById("timer-btn").className = "w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition";
 }
 
 function updateTimerDisplay() {
@@ -197,7 +250,56 @@ async function completeSession() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ duration_minutes: 25 })
     });
-    timeLeft = 25 * 60;
-    updateTimerDisplay();
+    resetTimer();
     refreshAllData();
+}
+
+// --- Synthesized Ambient Audio Generator (No External Files Required) ---
+function toggleNoise(type) {
+    if (activeNoiseType === type) {
+        stopNoise();
+        return;
+    }
+    stopNoise();
+    
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    const bufferSize = audioCtx.sampleRate * 2;
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+
+    const whiteNoise = audioCtx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+    whiteNoise.loop = true;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = type === 'rain' ? 'lowpass' : 'bandpass';
+    filter.frequency.value = type === 'rain' ? 800 : 1200;
+
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.05;
+
+    whiteNoise.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    whiteNoise.start();
+    activeNoiseNode = whiteNoise;
+    activeNoiseType = type;
+
+    document.getElementById(`${type}-btn`).classList.add("border-amber-500", "text-amber-400");
+}
+
+function stopNoise() {
+    if (activeNoiseNode) {
+        activeNoiseNode.stop();
+        activeNoiseNode = null;
+        activeNoiseType = null;
+        document.getElementById("noise-btn").classList.remove("border-amber-500", "text-amber-400");
+        document.getElementById("white-btn").classList.remove("border-amber-500", "text-amber-400");
+    }
 }

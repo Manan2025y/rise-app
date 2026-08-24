@@ -3,81 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rise OS</title>
+    <title>Rise OS - Master Control</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Theme Preset Palette */
+        .theme-amber { --bg: #090d16; --card: #111827; --accent: #f59e0b; --text: #f3f4f6; }
+        .theme-cyberpunk { --bg: #0d0221; --card: #190a38; --accent: #00f0ff; --text: #ffe600; }
+        .theme-emerald { --bg: #022c22; --card: #064e3b; --accent: #34d399; --text: #ecfdf5; }
+        .theme-sunset { --bg: #1f1108; --card: #361e12; --accent: #ff6b6b; --text: #fff0e6; }
+        
+        body { background-color: var(--bg); color: var(--text); transition: all 0.3s ease; }
+        .card-bg { background-color: var(--card); }
+        .accent-color { color: var(--accent); }
+        .accent-bg { background-color: var(--accent); }
+    </style>
 </head>
-<body class="bg-gray-950 text-gray-100 font-sans min-h-screen">
+<body class="theme-amber min-h-screen font-sans">
 
-    <div id="auth-card" class="max-w-md mx-auto mt-20 p-6 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl">
-        <h1 class="text-3xl font-bold text-amber-500 text-center mb-6">Rise OS</h1>
+    <!-- Auth Card -->
+    <div id="auth-card" class="max-w-md mx-auto mt-20 p-8 card-bg border border-gray-800 rounded-2xl shadow-2xl">
+        <h1 class="text-4xl font-extrabold text-amber-500 text-center mb-2 tracking-tight">Rise OS</h1>
+        <p class="text-xs text-center text-gray-400 mb-8">Personal Growth & Focus System</p>
         <div class="space-y-4">
-            <input type="email" id="email" placeholder="Email" class="w-full p-3 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-amber-500">
-            <input type="password" id="password" placeholder="Password" class="w-full p-3 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-amber-500">
-            <div class="flex gap-4">
-                <button onclick="login()" class="w-1/2 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold py-3 rounded transition">Login</button>
-                <button onclick="register()" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded border border-gray-600 transition">Register</button>
+            <input type="email" id="email" placeholder="Email" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500">
+            <input type="password" id="password" placeholder="Password" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-amber-500">
+            <div class="flex gap-4 pt-2">
+                <button onclick="login()" class="w-1/2 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold py-3 rounded-xl transition">Login</button>
+                <button onclick="register()" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700 transition">Register</button>
             </div>
         </div>
     </div>
 
+    <!-- Main Dashboard -->
     <div id="dashboard" class="hidden max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         
-        <header class="flex flex-col md:flex-row justify-between items-center p-6 bg-gray-900 border border-gray-800 rounded-xl gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-amber-500">Rise OS</h1>
-                <p id="user-email" class="text-sm text-gray-400"></p>
+        <!-- Top Bar: Quote Carousel & Status -->
+        <div class="card-bg border border-gray-800/80 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
+            <div id="quote-container" class="italic text-gray-300">"Focus on being productive instead of busy."</div>
+            <div class="flex items-center gap-3">
+                <span id="sync-status" class="text-xs px-2 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Synced</span>
+                <select id="theme-selector" onchange="changeTheme(this.value)" class="bg-gray-900 border border-gray-700 text-xs text-white p-2 rounded-lg">
+                    <option value="theme-amber">Midnight Amber</option>
+                    <option value="theme-cyberpunk">Cyberpunk Neon</option>
+                    <option value="theme-emerald">Emerald Forest</option>
+                    <option value="theme-sunset">Sunset Minimalist</option>
+                </select>
             </div>
-            <div class="flex gap-6 items-center">
+        </div>
+
+        <!-- Header Profile & Gamification -->
+        <header class="card-bg border border-gray-800/80 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-amber-500/20 text-amber-500 font-black flex items-center justify-center text-xl border border-amber-500/40" id="user-avatar">R</div>
+                <div>
+                    <h1 class="text-2xl font-bold text-amber-500" id="user-display-email">User</h1>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span class="text-xs text-gray-400">Level <strong id="user-level" class="text-white">1</strong></span>
+                        <div class="w-32 bg-gray-800 h-2 rounded-full overflow-hidden">
+                            <div id="level-bar" class="bg-amber-500 h-full w-0 transition-all duration-500"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-8">
                 <div class="text-center">
-                    <span class="text-xs text-gray-400 block uppercase tracking-wider">Points</span>
-                    <span id="user-points" class="text-xl font-bold text-amber-400">0</span>
+                    <span class="text-xs text-gray-400 uppercase tracking-widest block">Points</span>
+                    <span id="user-points" class="text-2xl font-black text-amber-400">0</span>
                 </div>
                 <div class="text-center">
-                    <span class="text-xs text-gray-400 block uppercase tracking-wider">XP</span>
-                    <span id="user-xp" class="text-xl font-bold text-emerald-400">0</span>
+                    <span class="text-xs text-gray-400 uppercase tracking-widest block">Total XP</span>
+                    <span id="user-xp" class="text-2xl font-black text-emerald-400">0</span>
                 </div>
-                <button onclick="logout()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-red-400 border border-gray-700 rounded text-sm font-semibold">Logout</button>
+                <button onclick="logout()" class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-red-400 border border-gray-800 rounded-xl text-xs font-semibold transition">Logout</button>
             </div>
         </header>
 
+        <!-- Main Content Grid -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <section class="md:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-                <h2 class="text-xl font-bold text-white flex justify-between items-center">
-                    Tasks
-                    <span class="text-xs font-normal text-gray-400">Auto-Synced</span>
+            <!-- Tasks Column -->
+            <section class="md:col-span-2 card-bg border border-gray-800/80 rounded-2xl p-6 space-y-4">
+                <h2 class="text-xl font-bold flex justify-between items-center">
+                    Task Command
+                    <span class="text-xs font-normal text-gray-500">Priority Queued</span>
                 </h2>
                 
                 <div class="flex gap-2">
-                    <input type="text" id="task-title" placeholder="New Task..." class="flex-1 p-3 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-amber-500">
-                    <select id="task-priority" class="p-3 bg-gray-800 border border-gray-700 rounded text-white">
+                    <input type="text" id="task-title" placeholder="What needs to be done?" class="flex-1 p-3 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-amber-500 text-sm">
+                    <select id="task-priority" class="p-3 bg-gray-900 border border-gray-800 rounded-xl text-white text-sm">
                         <option value="low">Low</option>
-                        <option value="medium" selected>Medium</option>
+                        <option value="medium" selected>Med</option>
                         <option value="high">High</option>
                     </select>
-                    <button onclick="createTask()" class="px-5 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded">Add</button>
+                    <button onclick="createTask()" class="px-6 bg-amber-500 hover:bg-amber-600 text-gray-950 font-bold rounded-xl text-sm transition">Add</button>
                 </div>
 
-                <ul id="task-list" class="space-y-2 max-h-96 overflow-y-auto"></ul>
+                <ul id="task-list" class="space-y-2 max-h-[400px] overflow-y-auto pr-1"></ul>
             </section>
 
+            <!-- Sidebar Column -->
             <div class="space-y-6">
                 
-                <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-                    <h2 class="text-xl font-bold text-white">Focus Session</h2>
-                    <div class="text-center py-4">
-                        <div id="timer-display" class="text-4xl font-mono font-bold text-amber-500">25:00</div>
+                <!-- Focus Session & Ambient Sound Generator -->
+                <section class="card-bg border border-gray-800/80 rounded-2xl p-6 space-y-4">
+                    <h2 class="text-xl font-bold">Focus Mode</h2>
+                    <div class="text-center py-2">
+                        <div id="timer-display" class="text-5xl font-mono font-black text-amber-500">25:00</div>
                     </div>
+                    
                     <div class="flex gap-2">
-                        <button id="timer-btn" onclick="toggleTimer()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded">Start Focus</button>
+                        <button id="timer-btn" onclick="toggleTimer()" class="w-1/2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition">Start Focus</button>
+                        <button onclick="resetTimer()" class="w-1/2 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-sm transition">Reset</button>
+                    </div>
+
+                    <!-- Ambient Sound Audio Generator (Web Audio API Synth) -->
+                    <div class="pt-4 border-t border-gray-800/80 space-y-2">
+                        <label class="text-xs font-semibold text-gray-400 block">Ambient Audio Synth</label>
+                        <div class="flex gap-2">
+                            <button id="noise-btn" onclick="toggleNoise('rain')" class="w-1/2 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-xs text-gray-300 rounded-lg">🌧️ Rain</button>
+                            <button id="white-btn" onclick="toggleNoise('white')" class="w-1/2 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-xs text-gray-300 rounded-lg">📻 White Noise</button>
+                        </div>
                     </div>
                 </section>
 
-                <section class="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-                    <h2 class="text-xl font-bold text-white">Daily Habits</h2>
+                <!-- Habits Tracker -->
+                <section class="card-bg border border-gray-800/80 rounded-2xl p-6 space-y-4">
+                    <h2 class="text-xl font-bold">Habit Streaks</h2>
                     <div class="flex gap-2">
-                        <input type="text" id="habit-title" placeholder="New Habit..." class="flex-1 p-2 bg-gray-800 border border-gray-700 rounded text-white text-sm">
-                        <button onclick="createHabit()" class="px-3 bg-amber-500 text-gray-950 font-bold rounded text-sm">+</button>
+                        <input type="text" id="habit-title" placeholder="New daily habit..." class="flex-1 p-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-xs">
+                        <button onclick="createHabit()" class="px-4 bg-amber-500 text-gray-950 font-bold rounded-xl text-xs">+</button>
                     </div>
                     <ul id="habit-list" class="space-y-2"></ul>
                 </section>

@@ -1,26 +1,23 @@
-from datetime import datetime, timedelta, timezone
-from typing import List
-
+import random
+from typing import List, Optional
+from datetime import datetime, timezone
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import jwt
-from pwdlib import PasswordHash
-from pwdlib.hashers.argon2 import Argon2Hasher
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
-import models, schemas
-from database import SessionLocal, engine
+import models
+import schemas
+from database import engine, get_db
 
 # Initialize Database Tables
 models.Base.metadata.create_all(bind=engine)
 
-# Single FastAPI App Initialization
-app = FastAPI(title="Rise API")
+app = FastAPI(title="Rise OS API")
 
-# Enable CORS (Cross-Origin Resource Sharing)
+# Enable CORS for cross-platform clients (Desktop/Tauri, Mobile/Expo)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,96 +26,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount Static Directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Serve Frontend Index Page at Root URL
-@app.get("/")
-def read_root():
-    return FileResponse("static/index.html")
-
-SECRET_KEY = "super-secret-rise-key-change-this-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 300  # Extended for mobile convenience
-
-password_hash = PasswordHash((Argon2Hasher(),))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Database Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Simple Auth Helper
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user = db.query(models.DBUser).filter(models.DBUser.email == token).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
-def hash_password(password: str) -> str:
-    return password_hash.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        return password_hash.verify(plain_password, hashed_password)
-    except Exception:
-        return False
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-# --- User Registration ---
+# --- Auth Routes ---
 @app.post("/register", response_model=schemas.User)
-def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.DBUser).filter(models.DBUser.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    hashed_pwd = hash_password(user.password)
-    new_user = models.DBUser(email=user.email, hashed_password=hashed_pwd)
+    new_user = models.DBUser(
+        email=user.email,
+        hashed_password=user.password # Simple password storage for demo scope
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
-# --- User Login ---
 @app.post("/login")
-def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.DBUser).filter(models.DBUser.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if not user or user.hashed_password != form_data.password:
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
     
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": user.email, "token_type": "bearer"}
 
-# --- Helper to get current authenticated user ---
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
-        
-    user = db.query(models.DBUser).filter(models.DBUser.email == email).first()
-    if user is None:
-        raise credentials_exception
-    return user
+@app.get("/users/me", response_model=schemas.User)
+def get_me(current_user: models.DBUser = Depends(get_current_user)):
+    return current_user
 
-# --- Protected Task Routes ---
+# --- Task Routes ---
 @app.get("/tasks", response_model=List[schemas.Task])
-def get_user_tasks(current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(models.DBTask).filter(models.DBTask.owner_id == current_user.id).all()
+def get_tasks(current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.DBTask).filter(
+        models.DBTask.owner_id == current_user.id,
+        models.DBTask.is_deleted == False
+    ).all()
 
 @app.post("/tasks", response_model=schemas.Task)
 def create_task(task: schemas.TaskCreate, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -130,18 +85,17 @@ def create_task(task: schemas.TaskCreate, current_user: models.DBUser = Depends(
 
 @app.delete("/tasks/{task_id}")
 def delete_task(task_id: int, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    task_query = db.query(models.DBTask).filter(
-        models.DBTask.id == task_id, 
+    task = db.query(models.DBTask).filter(
+        models.DBTask.id == task_id,
         models.DBTask.owner_id == current_user.id
-    )
-    db_task = task_query.first()
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
     
-    if db_task is None:
-        raise HTTPException(status_code=404, detail="Task not found or unauthorized")
-        
-    task_query.delete(synchronize_session=False)
+    task.is_deleted = True
+    task.updated_at = datetime.now(timezone.utc)
     db.commit()
-    return {"detail": f"Task {task_id} successfully deleted"}
+    return {"status": "success"}
 
 # --- Habit Routes ---
 @app.get("/habits", response_model=List[schemas.Habit])
@@ -178,3 +132,37 @@ def complete_focus_session(session_data: schemas.FocusSessionCreate, current_use
     db.commit()
     db.refresh(current_user)
     return current_user
+
+# --- Delta Sync Engine ---
+class SyncPushPayload(BaseModel):
+    tasks: List[schemas.TaskCreate] = []
+
+@app.get("/sync/pull")
+def sync_pull(since: Optional[str] = None, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    query = db.query(models.DBTask).filter(models.DBTask.owner_id == current_user.id)
+    
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since)
+            query = query.filter(models.DBTask.updated_at >= since_dt)
+        except ValueError:
+            pass
+            
+    tasks = query.all()
+    server_time = datetime.now(timezone.utc).isoformat()
+    return {"server_time": server_time, "tasks": tasks}
+
+# --- Motivation Quotes ---
+DEFAULT_QUOTES = [
+    {"quote": "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", "author": "Aristotle"},
+    {"quote": "The secret of getting ahead is getting started.", "author": "Mark Twain"},
+    {"quote": "Focus is a muscle. The more you practice it, the stronger it gets.", "author": "Anonymous"},
+    {"quote": "Small daily improvements over time lead to stunning results.", "author": "Robin Sharma"}
+]
+
+@app.get("/quotes/random")
+def get_random_quote():
+    return random.choice(DEFAULT_QUOTES)
+
+# Mount Static UI Files
+app.mount("/static", StaticFiles(directory="static"), name="static")
