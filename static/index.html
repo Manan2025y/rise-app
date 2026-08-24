@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise - Productivity App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-6">
+
+  <!-- Header -->
+  <header class="w-full max-w-2xl flex justify-between items-center mb-8 pb-4 border-b border-gray-800">
+    <h1 class="text-3xl font-bold text-amber-500">Rise</h1>
+    <div id="auth-status" class="text-sm text-gray-400">Not logged in</div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="w-full max-w-2xl space-y-6">
+
+    <!-- Auth Card (Login / Register) -->
+    <div id="auth-card" class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
+      <h2 id="form-title" class="text-xl font-semibold mb-4 text-gray-200">Account Login</h2>
+      <div class="space-y-4">
+        <input id="email" type="email" placeholder="Email" class="w-full p-3 rounded bg-gray-900 border border-gray-700 text-gray-100 focus:outline-none focus:border-amber-500">
+        <input id="password" type="password" placeholder="Password" class="w-full p-3 rounded bg-gray-900 border border-gray-700 text-gray-100 focus:outline-none focus:border-amber-500">
+        <div class="flex gap-4">
+          <button id="login-btn" onclick="login()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-3 rounded transition">Login</button>
+          <button id="register-btn" onclick="register()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold py-3 rounded transition">Register</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Dashboard (Hidden until logged in) -->
+    <div id="task-card" class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg hidden">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-gray-200">Your Tasks</h2>
+        <button onclick="logout()" class="text-sm text-red-400 hover:underline">Logout</button>
+      </div>
+
+      <!-- Add Task Form -->
+      <div class="flex gap-2 mb-6">
+        <input id="task-title" type="text" placeholder="Add a new task..." class="flex-1 p-3 rounded bg-gray-900 border border-gray-700 text-gray-100 focus:outline-none focus:border-amber-500">
+        <button onclick="createTask()" class="bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold px-6 py-3 rounded transition">Add</button>
+      </div>
+
+      <!-- Task List -->
+      <ul id="task-list" class="space-y-3"></ul>
+    </div>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
