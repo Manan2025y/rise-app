@@ -1,36 +1,50 @@
 from datetime import datetime, timedelta, timezone
+from typing import List
+
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import jwt
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 from sqlalchemy.orm import Session
-from typing import List
 
 import models, schemas
 from database import SessionLocal, engine
 
+# Initialize Database Tables
 models.Base.metadata.create_all(bind=engine)
 
+# Single FastAPI App Initialization
 app = FastAPI(title="Rise API")
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+# Enable CORS (Cross-Origin Resource Sharing)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --- Add this right after app = FastAPI(title="Rise API") ---
+# Mount Static Directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Serve Frontend Index Page at Root URL
 @app.get("/")
 def read_root():
     return FileResponse("static/index.html")
 
 SECRET_KEY = "super-secret-rise-key-change-this-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 300  # Extended for mobile convenience
 
 password_hash = PasswordHash((Argon2Hasher(),))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
+# Database Dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -52,10 +66,6 @@ def create_access_token(data: dict):
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-@app.get("/")
-def read_root():
-    return {"status": "online", "project": "Rise"}
 
 # --- User Registration ---
 @app.post("/register", response_model=schemas.User)
@@ -108,12 +118,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 # --- Protected Task Routes ---
 @app.get("/tasks", response_model=List[schemas.Task])
 def get_user_tasks(current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Returns ONLY tasks created by the logged-in user
     return db.query(models.DBTask).filter(models.DBTask.owner_id == current_user.id).all()
 
 @app.post("/tasks", response_model=schemas.Task)
 def create_task(task: schemas.TaskCreate, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Automatically links the new task to current_user.id
     db_task = models.DBTask(**task.model_dump(), owner_id=current_user.id)
     db.add(db_task)
     db.commit()
