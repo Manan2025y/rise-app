@@ -1,9 +1,8 @@
-// REPLACE THIS URL with your actual live Render Web Service URL (No slash at the end)
-const API_URL = "https://your-render-app-name.onrender.com";
+// Pointing directly to your live Render domain
+const API_URL = "https://rise-app-vcsk.onrender.com";
 
 let token = localStorage.getItem("rise_token");
 
-// Run UI check when page loads
 window.onload = () => {
     if (token) {
         showDashboard();
@@ -14,17 +13,26 @@ async function register() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const res = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-    });
+    if (!email || !password) {
+        alert("Please enter both email and password.");
+        return;
+    }
 
-    if (res.ok) {
-        alert("Registration successful! You can now log in.");
-    } else {
-        const data = await res.json();
-        alert(data.detail || "Registration failed");
+    try {
+        const res = await fetch(`${API_URL}/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (res.ok) {
+            alert("Registration successful! You can now log in.");
+        } else {
+            const data = await res.json();
+            alert(data.detail || "Registration failed");
+        }
+    } catch (err) {
+        alert("Server error. Render may take 30 seconds to wake up.");
     }
 }
 
@@ -32,23 +40,32 @@ async function login() {
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
 
-    const formData = new URLSearchParams();
-    formData.append("username", email);
-    formData.append("password", password);
+    if (!email || !password) {
+        alert("Please enter both email and password.");
+        return;
+    }
 
-    const res = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData
-    });
+    try {
+        const formData = new URLSearchParams();
+        formData.append("username", email);
+        formData.append("password", password);
 
-    if (res.ok) {
-        const data = await res.json();
-        token = data.access_token;
-        localStorage.setItem("rise_token", token);
-        showDashboard();
-    } else {
-        alert("Invalid credentials");
+        const res = await fetch(`${API_URL}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: formData
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            token = data.access_token;
+            localStorage.setItem("rise_token", token);
+            showDashboard();
+        } else {
+            alert("Invalid credentials");
+        }
+    } catch (err) {
+        alert("Server connection error.");
     }
 }
 
@@ -65,8 +82,6 @@ function showDashboard() {
     document.getElementById("task-card").classList.remove("hidden");
     document.getElementById("auth-status").innerText = "Logged In";
     fetchTasks();
-    
-    // Auto-sync tasks every 5 seconds so changes appear live!
     setInterval(fetchTasks, 5000);
 }
 
