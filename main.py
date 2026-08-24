@@ -142,3 +142,39 @@ def delete_task(task_id: int, current_user: models.DBUser = Depends(get_current_
     task_query.delete(synchronize_session=False)
     db.commit()
     return {"detail": f"Task {task_id} successfully deleted"}
+
+# --- Habit Routes ---
+@app.get("/habits", response_model=List[schemas.Habit])
+def get_habits(current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    return db.query(models.DBHabit).filter(
+        models.DBHabit.owner_id == current_user.id,
+        models.DBHabit.is_deleted == False
+    ).all()
+
+@app.post("/habits", response_model=schemas.Habit)
+def create_habit(habit: schemas.HabitCreate, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_habit = models.DBHabit(**habit.model_dump(), owner_id=current_user.id)
+    db.add(db_habit)
+    db.commit()
+    db.refresh(db_habit)
+    return db_habit
+
+# --- Focus Session & XP Routes ---
+@app.post("/focus/complete", response_model=schemas.User)
+def complete_focus_session(session_data: schemas.FocusSessionCreate, current_user: models.DBUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    xp_reward = session_data.duration_minutes * 2
+    points_reward = session_data.duration_minutes
+    
+    new_session = models.DBFocusSession(
+        owner_id=current_user.id,
+        duration_minutes=session_data.duration_minutes,
+        xp_earned=xp_reward
+    )
+    
+    current_user.xp += xp_reward
+    current_user.points += points_reward
+    
+    db.add(new_session)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
